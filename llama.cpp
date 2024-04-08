@@ -1,11 +1,13 @@
 #define LLAMA_API_INTERNAL
 #include "llama.h"
+#include <iostream>
 
 #include "unicode.h"
 
 #include "ggml.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
+#include <cstdio>
 
 #ifdef GGML_USE_CUDA
 #  include "ggml-cuda.h"
@@ -14506,6 +14508,9 @@ static bool llama_control_vector_init(struct llama_control_vector & cvec, const 
     GGML_ASSERT(cvec.ctxs.empty());
     GGML_ASSERT(cvec.bufs.empty());
 
+    // print model.hparams
+    // printf("model.hparams.n_layer: %d\n", model.hparams);
+
     // count layer buffer types
     std::map<ggml_backend_buffer_type_t, int> buft_layer_count;
     for (int64_t i = 0; i < model.hparams.n_layer; i++) {
@@ -14555,8 +14560,11 @@ static bool llama_control_vector_init(struct llama_control_vector & cvec, const 
 }
 
 int32_t llama_control_vector_apply(struct llama_context * lctx, const float * data, size_t len, int32_t n_embd, int32_t il_start, int32_t il_end) {
+    
+    // std::cout << "This is a message" << std::endl;
     const llama_model & model = lctx->model;
     llama_control_vector & cvec = lctx->cvec;
+    // std::cout << "Loaded cvec" << std::endl;
 
     if (data == nullptr) {
         // disable the current control vector (but leave allocated for later)
@@ -14565,21 +14573,37 @@ int32_t llama_control_vector_apply(struct llama_context * lctx, const float * da
         return 0;
     }
 
-    if (n_embd != (int) model.hparams.n_embd) {
-        LLAMA_LOG_ERROR("%s: control vector n_embd does not match model\n", __func__);
-        return 1;
-    }
+    // std::cout << "Passed data" << std::endl;
 
+    // printf("n_embd: %d\n", n_embd);
+    // printf("model.hparams.n_embd: %d\n", model.hparams.n_embd);
+
+    // if (n_embd != (int) model.hparams.n_embd) {
+    //     LLAMA_LOG_ERROR("%s: control vector n_embd does not match model\n", __func__);
+    //     return 1;
+    // }
+
+    // std::cout << "Passed n_bm" << std::endl;
+
+    // std::cout << "Buffers: " << cvec.bufs.size() << std::endl;
+    // std::cout << "Tensors: " << cvec.tensors.size() << std::endl;
+    
     if (cvec.tensors.empty()) {
         if (!llama_control_vector_init(cvec, model)) {
             return 1;
         }
     }
 
+    // std::cout << "Passed empty check" << std::endl;
+
+    // printf("il_start: %d\n", il_start);
+    // printf("il_end: %d\n", il_end);
+
     cvec.layer_start = il_start;
     cvec.layer_end   = il_end;
 
-    for (size_t il = 1; il < model.hparams.n_layer; il++) {
+    for (size_t il = 1; il < il_end; il++) {
+        // std::cout << "Asserting" << std::endl;
         assert(cvec.tensors[il] != nullptr);
 
         const size_t off = n_embd * (il - 1); // buffer doesn't have data for layer 0, since it's never present
